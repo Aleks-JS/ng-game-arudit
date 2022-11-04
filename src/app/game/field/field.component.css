@@ -1,0 +1,45 @@
+.field {
+  display: flex;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+}
+
+.cell {
+  width: 100px;
+  height: 100px;
+  border: 1px solid #c4c0c0;
+}
+
+.cell > * {
+  display: block;
+  height: 100%;
+  width: 100%;
+}
+
+.unit {
+  height: 100%;
+  width: 100%;
+}
+
+.red {
+  background-color: #c63f3f;
+}
+
+.green {
+  background-color: #41b01c;
+}
+
+.yellow {
+  background-color: #efed6a;
+}
+
+.black {
+  background-color: #151212;
+}
+
+.empty {
+  background-color: #c4c0c0;
+}

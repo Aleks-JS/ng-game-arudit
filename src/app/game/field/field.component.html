@@ -1,0 +1,10 @@
+<div class="field">
+  <div class="column" *ngFor="let row of matrix$ | async; index as y">
+    <p class="cell" [attr.datatype]="item!.corY" data-corY="5" data-corX="5" *ngFor="let item of row; index as x">
+      <ng-container [ngSwitch]="true">
+        <app-unit (click)="move(item)" *ngSwitchCase="checkIsUnit(item)" [unit]="item"></app-unit>
+        <span *ngSwitchDefault [class]="item?.color || 'empty'" ></span>
+      </ng-container>
+    </p>
+  </div>
+</div>
