@@ -1,10 +1,17 @@
-<div class="field">
+<div class="field" *ngIf="!(isFinishGame$ | async); else finishTpl">
   <div class="column" *ngFor="let row of matrix$ | async; index as y">
-    <p class="cell" [attr.datatype]="item!.corY" data-corY="5" data-corX="5" *ngFor="let item of row; index as x">
+    <p class="cell" [acceptableDirection]="item" *ngFor="let item of row; index as x">
       <ng-container [ngSwitch]="true">
         <app-unit (click)="move(item)" *ngSwitchCase="checkIsUnit(item)" [unit]="item"></app-unit>
-        <span *ngSwitchDefault [class]="item?.color || 'empty'" ></span>
+        <span *ngSwitchDefault [class]="item.color"></span>
       </ng-container>
     </p>
   </div>
 </div>
+
+<ng-template #finishTpl>
+  <div class="success">
+    <img src="assets/success.jpg" alt="Game over">
+    <button (click)="start()">Сыграть ещё раз</button>
+  </div>
+</ng-template>

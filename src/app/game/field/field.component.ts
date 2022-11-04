@@ -1,22 +1,22 @@
-import { Component, OnInit } from '@angular/core';
+import { Component } from '@angular/core';
 import { filter, map, Observable } from 'rxjs';
 import { GameStateService } from '../game.state.service';
-import { game } from '../model';
 import { Unit } from '../unit';
+import { EmptyCage } from '../empty-cage';
+import { Wall } from '../wall';
 
 @Component({
   selector: 'app-field',
   templateUrl: './field.component.html',
   styleUrls: ['./field.component.css']
 })
-export class FieldComponent implements OnInit {
+export class FieldComponent {
 
+  public isFinishGame$: Observable<boolean> = this.service.isFinish$;
 
-  public matrix$: Observable<(game.Unit | game.Wall | null)[][]> = this.service.matrix$.pipe(
+  public matrix$: Observable<(Unit | Wall | EmptyCage)[][]> = this.service.matrix$.pipe(
     filter(Boolean),
-    map(m => {
-      return [...m.values()];
-    })
+    map(m => [...m.values()])
   );
 
   constructor(
@@ -24,17 +24,18 @@ export class FieldComponent implements OnInit {
   ) {
   }
 
-  ngOnInit(): void {
+  public checkIsUnit(item: Unit | Wall | EmptyCage): boolean {
+    return item instanceof Unit;
   }
 
-  public checkIsUnit(item: game.Unit | game.Wall | null | undefined): boolean {
-    return !!item && !(item as game.Wall)?.block;
-  }
-
-  public move(item: game.Unit | game.Wall | null) {
+  public move(item: Unit | Wall | EmptyCage) {
     if (item instanceof Unit) {
       this.service.moveUnit(item)
 
     }
+  }
+
+  public start(): void {
+    this.service.isFinish$.next(false);
   }
 }

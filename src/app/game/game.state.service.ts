@@ -2,106 +2,112 @@ import { EventEmitter, Injectable } from '@angular/core';
 import { game } from './model';
 import { Wall } from './wall';
 import { Unit } from './unit';
-import { BehaviorSubject, map, merge, of } from 'rxjs';
-
-export enum ColumnTitle {
-  a = 'A',
-  b = 'B',
-  c = 'C',
-  d = 'D',
-  e = 'E'
-}
-
-const columnTitles = [
-  'A',
-  'B',
-  'C',
-  'D',
-  'E'];
+import {BehaviorSubject, distinctUntilChanged, filter, map, merge, of, Subject, switchMap, takeUntil, tap} from 'rxjs';
+import { EmptyCage } from './empty-cage';
+import { DestroyService } from '../common/destroyService';
 
 @Injectable({
   providedIn: 'root'
 })
-export class GameStateService {
+export class GameStateService extends DestroyService {
+
+  private matrix!: Map<number, (Unit | Wall | EmptyCage)[]>;
+  private selectedUnit: Unit | undefined;
+  private readonly colors = ['red', 'green', 'yellow'];
+
 
   public readonly acceptableDirections$ = new BehaviorSubject<game.Coordinates[]>([]);
+  public readonly selectedDirectionCell$ = new Subject<Unit | undefined>();
   public readonly change = new EventEmitter<void>();
-  public readonly matrix$ = merge(this.change, of(null)).pipe(
+
+  public readonly isFinish$ = new BehaviorSubject<boolean>(false);
+  public readonly matrix$ = this.isFinish$.pipe(
+    tap(bool => {
+      if (bool) {
+        this.matrix = new Map();
+        this.colorMap = new Map<string, number>(this.colors.map(color => [color, 5]));
+      }
+    }),
+    filter(o => !o),
+    distinctUntilChanged(),
+    switchMap(() => merge(this.change, of(null))),
     map(() => {
-      if (!this.matrix) {
+      console.log(this.matrix);
+      if (!this.matrix || !this.matrix.size) {
         this.initGenerateMatrix();
       }
-      console.log(this.matrix);
       return this.matrix;
-    })
+    }),
+    tap(matrix => this.isFinish$.next(![...matrix.values()].filter((m, i) => i%2 === 0).map(m => new Set(m.map(e => e.color)).size === 1).some(m => !m)))
   );
-  private matrix: Map<number, (game.Unit | game.Wall | null)[]> | undefined;
-  private readonly colors = ['red', 'green', 'yellow'];
-  public readonly colorMap = new Map<string, number>(this.colors.map(color => [color, 5]));
+  public colorMap = new Map<string, number>(this.colors.map(color => [color, 5]));
 
   constructor() {
+    super();
+    this.selectedDirectionCell$.pipe(
+      takeUntil(this)
+    ).subscribe(next => {
+      this.takeStep(this.matrix.get(this.selectedUnit!.corX)![this.selectedUnit!.corY],  this.matrix.get(next!.corX)![next!.corY]);
+      this.acceptableDirections$.next([]);
+    })
   }
 
-  public step(unit: game.Unit): void {
-
-  }
-
-  public initGenerateMatrix(): void {
-    this.matrix = new Map<number, Array<game.Unit | game.Wall | null>>();
+  private initGenerateMatrix(): void {
+    this.matrix = new Map<number, Array<Unit | Wall | EmptyCage>>();
     Array(5).fill(null).forEach((e, x) => {
       this.matrix!.set(x, Array(5).fill(null).map((e, y) => y % 2 === 0 && x % 2 !== 0
           ? new Wall({ corY: y, corX: x, color: 'black' })
           : y % 2 !== 0 && x % 2 !== 0
-            ? null
+            ? new EmptyCage({ corY: y, corX: x})
             : new Unit({ corY: y, corX: x, color: this.getRandomCol() })
         )
       );
     });
-    console.log(this.matrix);
   }
 
   public moveUnit(unit: Unit): void {
-    console.log(unit);
+    this.selectedUnit = unit;
     const { corX, corY } = unit;
     const matrix = this.matrix!;
     const acceptableDirections: game.Coordinates[] = [];
-    if (corX > 0 && !(matrix.get(corX - 1)![corY] instanceof Wall) && matrix.get(corX - 1)![corY] === null) {
-      acceptableDirections.push({ corX: corX - 1, corY });
-      // matrix.get(corX - 1)![corY] = new Unit({ corY: unit.corY, corX: unit.corX - 1, color: unit.color });
-      // matrix.get(corX)![corY] = null;
-      // this.change.next();
+    const directCor = {
+      left: corX - 1,
+      right: corX + 1,
+      top: corY - 1,
+      bottom: corY + 1
+    }
+    if (corX > 0 && !(matrix.get(directCor.left)![corY] instanceof Wall) && matrix.get(directCor.left)![corY] instanceof EmptyCage) {
+      acceptableDirections.push({ corX: directCor.left, corY });
       console.log('left');
     }
-    if (corX < matrix.size - 1 && !(matrix.get(corX + 1)![corY] instanceof Wall) &&
-      matrix.get(corX + 1)![corY] === null) {
-      acceptableDirections.push({ corX: corX + 1, corY });
-      // matrix.get(corX + 1)![corY] = new Unit({ corY: unit.corY, corX: unit.corX + 1, color: unit.color });
-      // matrix.get(corX)![corY] = null;
-      // this.change.next();
+    if (corX < matrix.size - 1 && !(matrix.get(directCor.right)![corY] instanceof Wall) &&
+      matrix.get(directCor.right)![corY] instanceof EmptyCage) {
+      acceptableDirections.push({ corX: directCor.right, corY });
       console.log('right');
     }
-    if (corY > 0 && !(matrix.get(corX)![corY - 1] instanceof Wall) && matrix.get(corX)![corY - 1] === null) {
-      acceptableDirections.push({ corX, corY: corY - 1 });
-      // matrix.get(corX)![corY - 1] = new Unit({ corY: unit.corY - 1, corX: unit.corX, color: unit.color });
-      // matrix.get(corX)![corY] = null;
-      // this.change.next();
+    if (corY > 0 && !(matrix.get(corX)![directCor.top] instanceof Wall) && matrix.get(corX)![directCor.top] instanceof EmptyCage) {
+      acceptableDirections.push({ corX, corY: directCor.top });
       console.log('top');
     }
-    if (corY < matrix.size - 1 && !(matrix.get(corX)![corY + 1] instanceof Wall) &&
-      matrix.get(corX)![corY + 1] === null) {
-      acceptableDirections.push({ corX, corY: corY + 1 });
-      // matrix.get(corX)![corY + 1] = new Unit({ corY: unit.corY + 1, corX: unit.corX, color: unit.color });
-      // matrix.get(corX)![corY] = null;
+    if (corY < matrix.size - 1 && !(matrix.get(corX)![directCor.bottom] instanceof Wall) &&
+      matrix.get(corX)![directCor.bottom] instanceof EmptyCage) {
+      acceptableDirections.push({ corX, corY: directCor.bottom });
       console.log('bottom');
     }
     if (acceptableDirections.length) {
       if (acceptableDirections.length === 1) {
         const {corX, corY} = acceptableDirections[0];
-        matrix.get(corX)![corY] = new Unit({ corY, corX, color: unit.color });
-        matrix.get(unit.corX)![unit.corY] = null;
-        this.change.next();
+        this.takeStep(matrix.get(unit.corX)![unit.corY],  matrix.get(corX)![corY]);
+      } else {
+        this.acceptableDirections$.next(acceptableDirections)
       }
     }
+  }
+
+  private takeStep(current: Unit, next: Unit): void {
+    this.matrix.get(next.corX)![next.corY] = new Unit({ corY: next.corY, corX: next.corX, color: current.color });
+    this.matrix.get(current.corX)![current.corY] = new EmptyCage({ corY: current.corY, corX: current.corX });
+    this.change.next();
   }
 
   private getRandomCol(): string {
